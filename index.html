@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Almacén · Picking &amp; Inventario</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+  :root{
+    --ink:#1C1E22;
+    --ink-soft:#2B2E34;
+    --paper:#F6F5F1;
+    --card:#FFFFFF;
+    --amber:#F5A623;
+    --amber-dark:#C77E0E;
+    --steel:#5B6672;
+    --steel-line:#DBD8D0;
+    --success:#2E7D5B;
+    --success-bg:#E7F3ED;
+    --alert:#C0392B;
+    --alert-bg:#FBEAE8;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; height:100%; background:var(--paper); font-family:var(--sans); color:var(--ink); overscroll-behavior:none;}
+  #app{max-width:480px; margin:0 auto; min-height:100vh; background:var(--paper); display:flex; flex-direction:column; position:relative;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:var(--ink); color:var(--paper); padding:14px 16px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:40;
+    border-bottom:3px solid var(--amber);
+  }
+  .topbar .brand{display:flex; align-items:center; gap:10px;}
+  .topbar .brand-mark{
+    width:28px; height:28px; background:var(--amber); border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; color:var(--ink); font-size:14px;
+  }
+  .topbar h1{font-size:15px; margin:0; font-weight:700; letter-spacing:.2px;}
+  .topbar .sub{font-size:11px; color:#B8BCC2; font-family:var(--mono);}
+  .topbar button.icon-btn{
+    background:none; border:1px solid #454951; color:var(--paper); border-radius:6px;
+    padding:6px 10px; font-size:11px; font-family:var(--mono); cursor:pointer;
+  }
+
+  /* ---------- Generic screen ---------- */
+  .screen{flex:1; display:flex; flex-direction:column; padding:20px 16px 100px;}
+  .screen.hidden{display:none;}
+
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--amber-dark); font-weight:600; margin-bottom:6px;
+  }
+  h2.title{font-size:22px; margin:0 0 18px; font-weight:800; letter-spacing:-.3px;}
+  p.help{color:var(--steel); font-size:13.5px; line-height:1.5; margin:0 0 20px;}
+
+  label.field-label{display:block; font-size:12px; font-weight:600; color:var(--steel); margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px;}
+  input[type=text], input[type=number]{
+    width:100%; padding:14px 14px; border-radius:10px; border:1.5px solid var(--steel-line);
+    background:var(--card); font-size:16px; font-family:var(--sans); color:var(--ink);
+  }
+  input:focus{outline:none; border-color:var(--amber-dark);}
+
+  .btn{
+    display:block; width:100%; padding:15px 18px; border-radius:10px; border:none;
+    font-family:var(--sans); font-weight:700; font-size:15px; cursor:pointer; text-align:center;
+  }
+  .btn-primary{background:var(--ink); color:var(--paper);}
+  .btn-primary:active{background:var(--ink-soft);}
+  .btn-amber{background:var(--amber); color:var(--ink);}
+  .btn-amber:active{background:var(--amber-dark);}
+  .btn-outline{background:var(--card); color:var(--ink); border:1.5px solid var(--steel-line);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+  .btn-row{display:flex; gap:10px;}
+  .btn-row .btn{flex:1;}
+
+  /* ---------- Login ---------- */
+  .login-wrap{flex:1; display:flex; flex-direction:column; justify-content:center; padding:24px 20px;}
+  .login-mark{
+    width:64px; height:64px; background:var(--ink); border-radius:14px; margin-bottom:22px;
+    display:flex; align-items:center; justify-content:center; border:3px solid var(--amber);
+  }
+  .login-mark span{font-family:var(--mono); font-weight:700; color:var(--amber); font-size:24px;}
+
+  /* ---------- Menu cards ---------- */
+  .mode-card{
+    background:var(--card); border:1.5px solid var(--steel-line); border-radius:14px;
+    padding:20px; margin-bottom:14px; display:flex; align-items:center; gap:16px; cursor:pointer;
+    position:relative; overflow:hidden;
+  }
+  .mode-card:active{border-color:var(--amber-dark);}
+  .mode-card .tag{
+    position:absolute; top:0; right:0; background:var(--amber); color:var(--ink);
+    font-family:var(--mono); font-size:10px; font-weight:700; padding:4px 10px 4px 14px;
+    border-bottom-left-radius:10px; letter-spacing:.5px;
+  }
+  .mode-icon{
+    width:46px; height:46px; border-radius:10px; background:var(--ink); color:var(--amber);
+    display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;
+  }
+  .mode-card h3{margin:0 0 4px; font-size:16.5px; font-weight:700;}
+  .mode-card p{margin:0; font-size:12.5px; color:var(--steel); line-height:1.4;}
+
+  .status-strip{
+    display:flex; justify-content:space-between; background:var(--card); border:1.5px solid var(--steel-line);
+    border-radius:10px; padding:12px 14px; margin-bottom:20px; font-family:var(--mono); font-size:11.5px;
+  }
+  .status-strip div{text-align:center; flex:1;}
+  .status-strip .num{display:block; font-size:17px; font-weight:700; color:var(--ink);}
+  .status-strip .lbl{color:var(--steel); text-transform:uppercase; letter-spacing:.4px; font-size:9.5px;}
+  .status-strip .divider{width:1px; background:var(--steel-line); margin:0 4px;}
+
+  /* ---------- Scanner ---------- */
+  .scan-launch{
+    background:var(--ink); border-radius:16px; padding:26px 20px; text-align:center; margin-bottom:16px;
+    border:2px dashed #454951;
+  }
+  .scan-launch p{color:#B8BCC2; font-size:12.5px; margin:10px 0 16px; font-family:var(--mono);}
+  #scanner-viewport{
+    width:100%; border-radius:14px; overflow:hidden; position:relative; background:#000;
+    margin-bottom:14px; display:none; aspect-ratio: 3/4;
+  }
+  #scanner-viewport.active{display:block;}
+  #scanner-viewport video, #scanner-viewport canvas{width:100% !important; height:100% !important; object-fit:cover;}
+  .scan-frame{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:92%; height:60%; border:2.5px solid var(--amber); border-radius:8px; pointer-events:none;
+    box-shadow:0 0 0 999px rgba(0,0,0,0.35);
+  }
+  .scan-close{
+    position:absolute; top:10px; right:10px; background:rgba(0,0,0,.6); color:#fff; border:none;
+    width:34px; height:34px; border-radius:50%; font-size:16px; cursor:pointer; z-index:5;
+  }
+  .manual-toggle{
+    text-align:center; font-size:12.5px; color:var(--steel); font-family:var(--mono);
+    text-decoration:underline; cursor:pointer; margin-bottom:16px;
+  }
+
+  /* ---------- Product tag card (signature element) ---------- */
+  .tag-card{
+    background:var(--card); border-radius:4px; position:relative; margin-bottom:18px;
+    box-shadow:0 2px 10px rgba(28,30,34,0.08); border:1.5px solid var(--ink);
+  }
+  .tag-card::before{
+    content:''; position:absolute; left:0; top:0; bottom:0; width:10px;
+    background:repeating-linear-gradient(180deg, var(--paper) 0 6px, var(--ink) 6px 8px);
+  }
+  .tag-card .tag-inner{padding:16px 16px 16px 24px;}
+  .tag-card .tag-corner{
+    position:absolute; top:-1px; right:-1px; background:var(--amber); color:var(--ink);
+    font-family:var(--mono); font-size:10px; font-weight:700; padding:5px 10px; letter-spacing:.5px;
+    border-bottom-left-radius:6px;
+  }
+  .tag-sku{font-family:var(--mono); font-size:20px; font-weight:700; letter-spacing:.5px; margin:0 0 2px;}
+  .tag-desc{font-size:14px; color:var(--ink-soft); margin:0 0 14px; line-height:1.35;}
+  .tag-grid{display:flex; gap:10px;}
+  .tag-cell{flex:1; background:var(--paper); border-radius:8px; padding:10px 12px;}
+  .tag-cell .k{font-size:9.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--steel); font-family:var(--mono); display:block; margin-bottom:3px;}
+  .tag-cell .v{font-size:15px; font-weight:700; font-family:var(--mono);}
+  .tag-cell.location .v{color:var(--amber-dark);}
+
+  .qty-row{display:flex; align-items:center; gap:10px; margin:16px 0;}
+  .qty-btn{
+    width:48px; height:48px; border-radius:10px; border:1.5px solid var(--steel-line); background:var(--card);
+    font-size:20px; font-weight:700; color:var(--ink); cursor:pointer; flex-shrink:0;
+  }
+  .qty-row input{text-align:center; font-family:var(--mono); font-size:20px; font-weight:700;}
+
+  .not-found{
+    background:var(--alert-bg); border:1.5px solid var(--alert); border-radius:10px; padding:14px;
+    color:var(--alert); font-size:13.5px; font-weight:600; margin-bottom:16px; text-align:center;
+  }
+
+  /* ---------- Lists ---------- */
+  .list-item{
+    background:var(--card); border:1px solid var(--steel-line); border-radius:10px; padding:12px 14px;
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+  }
+  .list-item .li-left .sku{font-family:var(--mono); font-weight:700; font-size:13.5px;}
+  .list-item .li-left .desc{font-size:11.5px; color:var(--steel); margin-top:2px;}
+  .list-item .li-left .meta{font-size:10.5px; color:var(--steel); font-family:var(--mono); margin-top:2px;}
+  .list-item .li-right{font-family:var(--mono); font-weight:700; font-size:15px; text-align:right;}
+  .list-item .li-right .u{font-size:9.5px; color:var(--steel); font-weight:500; display:block;}
+  .list-item.diff-ok{border-left:4px solid var(--success);}
+  .list-item.diff-bad{border-left:4px solid var(--alert);}
+  .diff-badge{font-family:var(--mono); font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; margin-top:4px; display:inline-block;}
+  .diff-badge.ok{background:var(--success-bg); color:var(--success);}
+  .diff-badge.bad{background:var(--alert-bg); color:var(--alert);}
+
+  .empty-state{text-align:center; padding:40px 20px; color:var(--steel);}
+  .empty-state .em-icon{font-size:32px; margin-bottom:10px;}
+  .empty-state p{font-size:13px; margin:0;}
+
+  /* ---------- Zone chips ---------- */
+  .zone-chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;}
+  .zone-chip{
+    padding:9px 15px; border-radius:20px; border:1.5px solid var(--steel-line); background:var(--card);
+    font-size:12.5px; font-weight:600; font-family:var(--mono); cursor:pointer; color:var(--ink);
+  }
+  .zone-chip.active{background:var(--ink); color:var(--amber); border-color:var(--ink);}
+
+  /* ---------- Bottom nav ---------- */
+  .bottom-bar{
+    position:sticky; bottom:0; background:var(--card); border-top:1.5px solid var(--steel-line);
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom)); z-index:30;
+  }
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:fixed; bottom:100px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--ink); color:var(--paper); padding:12px 20px; border-radius:30px; font-size:13px;
+    font-weight:600; z-index:100; transition:all .25s ease; pointer-events:none; max-width:90%; text-align:center;
+    border:1.5px solid var(--amber);
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .section-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+  .section-head h3{margin:0; font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--steel); font-weight:700;}
+  .section-head .count{font-family:var(--mono); font-size:12px; color:var(--amber-dark); font-weight:700;}
+
+  .upload-box{
+    border:2px dashed var(--steel-line); border-radius:14px; padding:28px 20px; text-align:center;
+    background:var(--card); margin-bottom:16px;
+  }
+  .upload-box .up-icon{font-size:26px; margin-bottom:8px;}
+  .upload-box p{margin:0 0 4px; font-size:13px; color:var(--steel);}
+  .upload-box .fname{font-family:var(--mono); font-size:12.5px; color:var(--success); font-weight:700; margin-top:8px;}
+
+  .col-hint{font-family:var(--mono); font-size:11px; color:var(--steel); background:var(--card); border:1px solid var(--steel-line); border-radius:8px; padding:10px 12px; margin-bottom:16px; line-height:1.6;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ TOPBAR ============ -->
+  <div class="topbar" id="topbar" style="display:none;">
+    <div class="brand">
+      <div class="brand-mark">A</div>
+      <div>
+        <h1 id="topbarTitle">Almacén</h1>
+        <div class="sub" id="topbarUser">—</div>
+      </div>
+    </div>
+    <button class="icon-btn" onclick="goTo('menu')">Menú</button>
+  </div>
+
+  <!-- ============ SCREEN: LOGIN ============ -->
+  <div class="screen" id="screen-login">
+    <div class="login-wrap">
+      <div class="login-mark"><span>A</span></div>
+      <div class="eyebrow">Bartori S.A.C. · Almacén</div>
+      <h2 class="title">Picking &amp; Inventario Cíclico</h2>
+      <p class="help">Ingresa tu nombre para iniciar sesión. Los datos se guardan solo en este dispositivo mientras dure la sesión.</p>
+      <label class="field-label">Nombre del almacenero</label>
+      <input type="text" id="inputUserName" placeholder="Ej. Saúl Vílchez" style="margin-bottom:14px;">
+      <button class="btn btn-amber" onclick="handleLogin()">Ingresar</button>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN: UPLOAD EXCEL ============ -->
+  <div class="screen hidden" id="screen-upload">
+    <div class="eyebrow">Paso 1 de 1</div>
+    <h2 class="title">Cargar base de productos</h2>
+    <p class="help">Sube el Excel (.xlsx) con las columnas: <b>SKU, Descripción, Ubicación, Zona, Stock</b>. Esta será la data de prueba para picking e inventario.</p>
+
+    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+      <div class="up-icon">📄</div>
+      <p><b>Toca para elegir archivo</b></p>
+      <p>Formato .xlsx</p>
+      <div class="fname" id="fileName"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none;" onchange="handleFileUpload(event)">
+
+    <div class="col-hint">
+      Columnas esperadas (exactas o similares):<br>
+      SKU · Descripción · Ubicación · Zona · Stock
+    </div>
+
+    <button class="btn btn-primary" id="btnUseSample" onclick="loadSampleData()">Usar data de ejemplo (probar sin Excel)</button>
+  </div>
+
+  <!-- ============ SCREEN: MENU ============ -->
+  <div class="screen hidden" id="screen-menu">
+    <div class="eyebrow">Panel principal</div>
+    <h2 class="title">¿Qué vas a hacer?</h2>
+
+    <div class="status-strip">
+      <div><span class="num" id="statProducts">0</span><span class="lbl">Productos</span></div>
+      <div class="divider"></div>
+      <div><span class="num" id="statZones">0</span><span class="lbl">Zonas</span></div>
+      <div class="divider"></div>
+      <div><span class="num" id="statPicks">0</span><span class="lbl">Picks hoy</span></div>
+      <div class="divider"></div>
+      <div><span class="num" id="statCounts">0</span><span class="lbl">Conteos</span></div>
+    </div>
+
+    <div class="mode-card" onclick="goTo('picking')">
+      <div class="mode-icon">▤</div>
+      <div><h3>Picking</h3><p>Escanea la orden y arma el pedido guiado por ubicación</p></div>
+    </div>
+
+    <div class="mode-card" onclick="goTo('zoneSelect')">
+      <div class="mode-icon">⟳</div>
+      <div><h3>Inventario Cíclico</h3><p>Cuenta física por zona y compara contra el stock del sistema</p></div>
+    </div>
+
+    <button class="btn btn-outline" style="margin-top:6px;" onclick="goTo('upload')">Cambiar base de productos (Excel)</button>
+  </div>
+
+  <!-- ============ SCREEN: PICKING ============ -->
+  <div class="screen hidden" id="screen-picking">
+    <div class="eyebrow">Picking</div>
+    <h2 class="title">Escanear producto</h2>
+
+    <div class="scan-launch" id="scanLaunchPicking">
+      <div style="color:var(--amber); font-size:28px;">▣</div>
+      <p>Apunta la cámara al código de barras del producto</p>
+      <button class="btn btn-amber" onclick="startScanner('picking')">Iniciar cámara</button>
+    </div>
+
+    <div id="scanner-viewport-picking" class="scanner-viewport-slot"></div>
+    <div class="manual-toggle" onclick="toggleManual('picking')">o ingresar código manualmente</div>
+    <div id="manualEntryPicking" style="display:none; margin-bottom:16px;">
+      <div class="btn-row">
+        <input type="text" id="manualCodePicking" placeholder="Código / SKU">
+        <button class="btn btn-primary" style="flex:0 0 auto; width:90px;" onclick="lookupManual('picking')">Buscar</button>
+      </div>
+    </div>
+
+    <div id="pickingResultZone"></div>
+
+    <div class="section-head">
+      <h3>Lista de picking</h3>
+      <span class="count" id="pickingListCount">0 items</span>
+    </div>
+    <div id="pickingList"></div>
+
+    <div class="bottom-bar" id="pickingBottomBar" style="display:none;">
+      <button class="btn btn-primary" onclick="exportPickingList()">Exportar picking a Excel</button>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN: ZONE SELECT ============ -->
+  <div class="screen hidden" id="screen-zoneSelect">
+    <div class="eyebrow">Inventario cíclico</div>
+    <h2 class="title">Selecciona una zona</h2>
+    <p class="help">Se contarán solo los productos ubicados en la zona elegida.</p>
+    <div class="zone-chips" id="zoneChips"></div>
+  </div>
+
+  <!-- ============ SCREEN: INVENTORY ============ -->
+  <div class="screen hidden" id="screen-inventory">
+    <div class="eyebrow" id="invZoneLabel">Zona</div>
+    <h2 class="title">Conteo físico</h2>
+
+    <div class="scan-launch" id="scanLaunchInv">
+      <div style="color:var(--amber); font-size:28px;">▣</div>
+      <p>Escanea el producto a contar en esta zona</p>
+      <button class="btn btn-amber" onclick="startScanner('inventory')">Iniciar cámara</button>
+    </div>
+
+    <div id="scanner-viewport-inventory" class="scanner-viewport-slot"></div>
+    <div class="manual-toggle" onclick="toggleManual('inventory')">o ingresar código manualmente</div>
+    <div id="manualEntryInventory" style="display:none; margin-bottom:16px;">
+      <div class="btn-row">
+        <input type="text" id="manualCodeInventory" placeholder="Código / SKU">
+        <button class="btn btn-primary" style="flex:0 0 auto; width:90px;" onclick="lookupManual('inventory')">Buscar</button>
+      </div>
+    </div>
+
+    <div id="inventoryResultZone"></div>
+
+    <div class="section-head">
+      <h3>Pendientes por contar</h3>
+      <span class="count" id="pendingCount">0</span>
+    </div>
+    <div id="pendingList"></div>
+
+    <div class="section-head" style="margin-top:18px;">
+      <h3>Contados</h3>
+      <span class="count" id="countedCount">0</span>
+    </div>
+    <div id="countedList"></div>
+
+    <div class="bottom-bar" id="inventoryBottomBar" style="display:none;">
+      <button class="btn btn-primary" onclick="exportInventoryReport()">Exportar reporte de diferencias</button>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   STATE
+=============================================================*/
+let state = {
+  userName: '',
+  products: [],          // {sku, desc, ubicacion, zona, stock}
+  productIndex: {},      // sku(lowercase) -> product
+  pickingList: [],        // {sku, desc, ubicacion, cantidad, ts}
+  currentZone: null,
+  inventoryCounts: {},    // zona -> { sku: {sku,desc,ubicacion,stockSistema,conteo,diferencia,ts} }
+  scannerActiveFor: null, // 'picking' | 'inventory' | null
+  pendingScanTarget: null
+};
+
+/* ============================================================
+   NAVIGATION
+=============================================================*/
+function goTo(screen){
+  stopScanner();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('screen-'+screen).classList.remove('hidden');
+  document.getElementById('topbar').style.display = screen==='login' ? 'none' : 'flex';
+  const titles = {upload:'Cargar base', menu:'Menú principal', picking:'Picking', zoneSelect:'Inventario', inventory:'Conteo físico'};
+  document.getElementById('topbarTitle').textContent = titles[screen] || 'Almacén';
+  if(screen==='menu') renderMenuStats();
+  if(screen==='zoneSelect') renderZoneChips();
+  if(screen==='picking') renderPickingList();
+  if(screen==='inventory') renderInventoryLists();
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ============================================================
+   LOGIN
+=============================================================*/
+function handleLogin(){
+  const val = document.getElementById('inputUserName').value.trim();
+  if(!val){ showToast('Ingresa tu nombre para continuar'); return; }
+  state.userName = val;
+  document.getElementById('topbarUser').textContent = val;
+  goTo('upload');
+}
+
+/* ============================================================
+   EXCEL UPLOAD / PARSING
+=============================================================*/
+function normalizeKey(k){
+  return k.toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,''); // strip accents
+}
+
+function handleFileUpload(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  document.getElementById('fileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      parseProductRows(rows);
+    }catch(err){
+      showToast('No se pudo leer el archivo. Verifica el formato.');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseProductRows(rows){
+  if(!rows.length){ showToast('El archivo está vacío'); return; }
+  const products = [];
+  const keyMap = {}; // normalized -> original key, built from first row
+  Object.keys(rows[0]).forEach(k=> keyMap[normalizeKey(k)] = k);
+
+  const findKey = (candidates)=>{
+    for(const c of candidates){ if(keyMap[c]) return keyMap[c]; }
+    return null;
+  };
+  const kSku = findKey(['sku','codigo','codigo de barras','codigobarras','cod']);
+  const kDesc = findKey(['descripcion','producto','nombre']);
+  const kUbi = findKey(['ubicacion','ubicacion fisica','rack','posicion']);
+  const kZona = findKey(['zona','area']);
+  const kStock = findKey(['stock','cantidad','existencia']);
+
+  if(!kSku){ showToast('No se encontró columna de SKU/Código'); return; }
+
+  rows.forEach(r=>{
+    const sku = (r[kSku]||'').toString().trim();
+    if(!sku) return;
+    products.push({
+      sku,
+      desc: kDesc ? (r[kDesc]||'').toString().trim() : '(sin descripción)',
+      ubicacion: kUbi ? (r[kUbi]||'').toString().trim() : '—',
+      zona: kZona ? (r[kZona]||'').toString().trim() : 'General',
+      stock: kStock ? Number(r[kStock])||0 : 0
+    });
+  });
+
+  applyProducts(products);
+}
+
+function loadSampleData(){
+  const zonas = ['A - Materia Prima','B - Producción','C - Producto Terminado'];
+  const sample = [];
+  for(let i=1;i<=18;i++){
+    const zona = zonas[i%3];
+    sample.push({
+      sku: 'BT' + (1000+i),
+      desc: ['Cono Barquillo Grande','Cono Sugar Cone','Cono Wafer Chocolate','Caja Cono x500 und','Envoltura Individual Cono','Harina para Barquillo 25kg'][i%6] + ' - Lote ' + i,
+      ubicacion: zona[0] + '-' + (10+i) + '-0' + (1+(i%3)),
+      zona: zona,
+      stock: Math.floor(Math.random()*200)+10
+    });
+  }
+  applyProducts(sample);
+  showToast('Data de ejemplo cargada (' + sample.length + ' productos)');
+}
+
+function applyProducts(products){
+  state.products = products;
+  state.productIndex = {};
+  products.forEach(p=> state.productIndex[p.sku.toLowerCase()] = p);
+  document.getElementById('fileName').textContent = products.length + ' productos cargados ✓';
+  showToast(products.length + ' productos cargados correctamente');
+  setTimeout(()=> goTo('menu'), 500);
+}
+
+/* ============================================================
+   MENU STATS
+=============================================================*/
+function renderMenuStats(){
+  document.getElementById('statProducts').textContent = state.products.length;
+  const zonas = new Set(state.products.map(p=>p.zona));
+  document.getElementById('statZones').textContent = zonas.size;
+  document.getElementById('statPicks').textContent = state.pickingList.length;
+  let totalCounts = 0;
+  Object.values(state.inventoryCounts).forEach(z=> totalCounts += Object.keys(z).length);
+  document.getElementById('statCounts').textContent = totalCounts;
+}
+
+/* ============================================================
+   SCANNER (Quagga.js)
+=============================================================*/
+function startScanner(target){
+  // 1) Secure-context check — camera APIs only work on https:// or localhost
+  if(!window.isSecureContext){
+    showScanError(target, 'Este navegador bloquea la cámara porque la página no está en HTTPS. Descarga el archivo y ábrelo directo en Chrome o Safari (no dentro de una vista previa embebida).');
+    return;
+  }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showScanError(target, 'Este navegador no soporta acceso a cámara desde esta vista. Prueba abriendo el archivo directamente en Chrome o Safari.');
+    return;
+  }
+
+  state.scannerActiveFor = target;
+  const launchId = target==='picking' ? 'scanLaunchPicking' : 'scanLaunchInv';
+  document.getElementById(launchId).style.display='none';
+
+  // 2) Ask for camera permission OURSELVES first, so we get the real error
+  //    instead of Quagga failing silently and leaving a black box.
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(function(stream){
+      // We only needed this to confirm permission + get a real error message.
+      // Stop this test stream; Quagga will open its own.
+      stream.getTracks().forEach(t=>t.stop());
+      launchQuagga(target);
+    })
+    .catch(function(err){
+      console.error(err);
+      let msg = 'No se pudo acceder a la cámara.';
+      if(err.name === 'NotAllowedError') msg = 'Permiso de cámara denegado. Ve a Configuración del navegador → Permisos del sitio → Cámara, y permite el acceso. Si estás dentro de la vista previa de Claude, descarga el archivo y ábrelo directo en el navegador.';
+      else if(err.name === 'NotFoundError') msg = 'No se encontró ninguna cámara en este dispositivo.';
+      else if(err.name === 'NotReadableError') msg = 'La cámara está siendo usada por otra app. Cierra otras apps que la usen e intenta de nuevo.';
+      else if(err.name === 'SecurityError') msg = 'El navegador bloqueó el acceso a la cámara en este contexto (vista previa embebida). Descarga el archivo y ábrelo directo en Chrome o Safari.';
+      showScanError(target, msg);
+      document.getElementById(launchId).style.display='block';
+    });
+}
+
+function showScanError(target, msg){
+  const zone = document.getElementById(target==='picking' ? 'pickingResultZone' : 'inventoryResultZone');
+  zone.innerHTML = `<div class="not-found">⚠ ${escapeHtml(msg)}</div>`;
+  showToast('No se pudo iniciar la cámara');
+}
+
+function launchQuagga(target){
+  const slot = document.getElementById('scanner-viewport-'+target);
+  slot.innerHTML = '<div id="scanner-viewport" class="active"><button class="scan-close" onclick="stopScanner()">✕</button><div class="scan-frame"></div></div>';
+
+  Quagga.init({
+    inputStream:{
+      name:'Live', type:'LiveStream', target: document.getElementById('scanner-viewport'),
+      constraints:{ facingMode:'environment', width:{ideal:720}, height:{ideal:960} }
+    },
+    decoder:{ readers:['code_128_reader','ean_reader','ean_8_reader','upc_reader','code_39_reader'] },
+    locate:true,
+    locator:{ patchSize:'medium', halfSample:true }
+  }, function(err){
+    if(err){
+      console.error(err);
+      showScanError(target, 'No se pudo iniciar el lector de códigos. Intenta recargar la página.');
+      stopScanner();
+      return;
+    }
+    Quagga.start();
+    patchVideoForMobile();
+  });
+
+  let lastCode = null, lastTime = 0;
+  Quagga.onDetected(function(result){
+    const code = result.codeResult.code;
+    const now = Date.now();
+    if(code === lastCode && now - lastTime < 1500) return; // debounce dupes
+    lastCode = code; lastTime = now;
+    if(navigator.vibrate) navigator.vibrate(80);
+    handleScanResult(code, target);
+  });
+}
+
+// iOS Safari (and some Android webviews) leave the <video> element black
+// unless it explicitly has playsinline + muted + autoplay attributes.
+function patchVideoForMobile(){
+  setTimeout(function(){
+    const vp = document.getElementById('scanner-viewport');
+    if(!vp) return;
+    const video = vp.querySelector('video');
+    if(video){
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+      video.setAttribute('muted', 'true');
+      video.muted = true;
+      video.setAttribute('autoplay', 'true');
+      video.play().catch(()=>{});
+    }
+  }, 150);
+}
+
+function stopScanner(){
+  try{ Quagga.offDetected(); Quagga.stop(); }catch(e){}
+  ['picking','inventory'].forEach(t=>{
+    const slot = document.getElementById('scanner-viewport-'+t);
+    if(slot) slot.innerHTML='';
+    const launch = document.getElementById(t==='picking' ? 'scanLaunchPicking' : 'scanLaunchInv');
+    if(launch) launch.style.display='block';
+  });
+  state.scannerActiveFor = null;
+}
+
+function toggleManual(target){
+  const el = document.getElementById('manualEntry' + (target==='picking'?'Picking':'Inventory'));
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function lookupManual(target){
+  const input = document.getElementById('manualCode' + (target==='picking'?'Picking':'Inventory'));
+  const code = input.value.trim();
+  if(!code){ showToast('Ingresa un código'); return; }
+  handleScanResult(code, target);
+  input.value='';
+}
+
+/* ============================================================
+   SCAN RESULT HANDLING
+=============================================================*/
+function handleScanResult(code, target){
+  const product = state.productIndex[code.toLowerCase()];
+  if(target==='picking') renderPickingResult(product, code);
+  if(target==='inventory') renderInventoryResult(product, code);
+}
+
+/* ---------------- PICKING ---------------- */
+function renderPickingResult(product, rawCode){
+  const zone = document.getElementById('pickingResultZone');
+  if(!product){
+    zone.innerHTML = `<div class="not-found">⚠ Código "${escapeHtml(rawCode)}" no encontrado en la base de productos</div>`;
+    return;
+  }
+  zone.innerHTML = `
+    <div class="tag-card">
+      <div class="tag-corner">EN STOCK</div>
+      <div class="tag-inner">
+        <p class="tag-sku">${escapeHtml(product.sku)}</p>
+        <p class="tag-desc">${escapeHtml(product.desc)}</p>
+        <div class="tag-grid">
+          <div class="tag-cell location"><span class="k">Ubicación</span><span class="v">${escapeHtml(product.ubicacion)}</span></div>
+          <div class="tag-cell"><span class="k">Stock sistema</span><span class="v">${product.stock}</span></div>
+        </div>
+        <div class="qty-row">
+          <button class="qty-btn" onclick="stepQty(-1)">−</button>
+          <input type="number" id="pickQty" value="1" min="1">
+          <button class="qty-btn" onclick="stepQty(1)">+</button>
+        </div>
+        <button class="btn btn-amber" onclick="confirmPick('${escapeAttr(product.sku)}')">Agregar al picking</button>
+      </div>
+    </div>`;
+}
+
+function stepQty(delta){
+  const inp = document.getElementById('pickQty');
+  let v = parseInt(inp.value||'1',10) + delta;
+  if(v < 1) v = 1;
+  inp.value = v;
+}
+
+function confirmPick(sku){
+  const product = state.productIndex[sku.toLowerCase()];
+  const qty = parseInt(document.getElementById('pickQty').value||'1',10);
+  state.pickingList.push({
+    sku: product.sku, desc: product.desc, ubicacion: product.ubicacion,
+    cantidad: qty, usuario: state.userName, ts: new Date().toLocaleTimeString('es-PE')
+  });
+  document.getElementById('pickingResultZone').innerHTML='';
+  showToast(`✓ ${product.sku} agregado (x${qty})`);
+  renderPickingList();
+}
+
+function renderPickingList(){
+  const wrap = document.getElementById('pickingList');
+  const items = state.pickingList;
+  document.getElementById('pickingListCount').textContent = items.length + ' items';
+  document.getElementById('pickingBottomBar').style.display = items.length ? 'block' : 'none';
+  if(!items.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="em-icon">▤</div><p>Aún no has agregado productos.<br>Escanea el primer código para empezar.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = items.slice().reverse().map((it,idx)=>`
+    <div class="list-item">
+      <div class="li-left">
+        <div class="sku">${escapeHtml(it.sku)}</div>
+        <div class="desc">${escapeHtml(it.desc)}</div>
+        <div class="meta">${escapeHtml(it.ubicacion)} · ${it.ts}</div>
+      </div>
+      <div class="li-right">x${it.cantidad}<span class="u">und</span></div>
+    </div>`).join('');
+}
+
+function exportPickingList(){
+  if(!state.pickingList.length){ showToast('No hay items para exportar'); return; }
+  const rows = state.pickingList.map(it=>({
+    SKU: it.sku, Descripcion: it.desc, Ubicacion: it.ubicacion, Cantidad: it.cantidad,
+    Almacenero: it.usuario, Hora: it.ts
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Picking');
+  const fname = `picking_${state.userName.replace(/\s+/g,'_')}_${dateStamp()}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  showToast('Excel exportado: ' + fname);
+}
+
+/* ---------------- INVENTORY ---------------- */
+function renderZoneChips(){
+  const zonas = [...new Set(state.products.map(p=>p.zona))].sort();
+  const wrap = document.getElementById('zoneChips');
+  if(!zonas.length){
+    wrap.innerHTML = `<div class="empty-state"><p>No hay zonas cargadas. Sube primero tu Excel de productos.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = zonas.map(z=>`<div class="zone-chip" onclick="selectZone('${escapeAttr(z)}')">${escapeHtml(z)}</div>`).join('');
+}
+
+function selectZone(zona){
+  state.currentZone = zona;
+  if(!state.inventoryCounts[zona]) state.inventoryCounts[zona] = {};
+  document.getElementById('invZoneLabel').textContent = 'Inventario cíclico · ' + zona;
+  goTo('inventory');
+}
+
+function renderInventoryResult(product, rawCode){
+  const zone = document.getElementById('inventoryResultZone');
+  if(!product){
+    zone.innerHTML = `<div class="not-found">⚠ Código "${escapeHtml(rawCode)}" no encontrado en la base de productos</div>`;
+    return;
+  }
+  if(product.zona !== state.currentZone){
+    zone.innerHTML = `<div class="not-found">⚠ ${escapeHtml(product.sku)} pertenece a la zona "${escapeHtml(product.zona)}", no a "${escapeHtml(state.currentZone)}"</div>`;
+    return;
+  }
+  zone.innerHTML = `
+    <div class="tag-card">
+      <div class="tag-corner">CONTAR</div>
+      <div class="tag-inner">
+        <p class="tag-sku">${escapeHtml(product.sku)}</p>
+        <p class="tag-desc">${escapeHtml(product.desc)}</p>
+        <div class="tag-grid">
+          <div class="tag-cell location"><span class="k">Ubicación</span><span class="v">${escapeHtml(product.ubicacion)}</span></div>
+          <div class="tag-cell"><span class="k">Stock sistema</span><span class="v">${product.stock}</span></div>
+        </div>
+        <label class="field-label" style="margin-top:14px;">Conteo físico real</label>
+        <input type="number" id="countQty" placeholder="Cantidad contada" value="${product.stock}">
+        <button class="btn btn-amber" style="margin-top:12px;" onclick="confirmCount('${escapeAttr(product.sku)}')">Registrar conteo</button>
+      </div>
+    </div>`;
+}
+
+function confirmCount(sku){
+  const product = state.productIndex[sku.toLowerCase()];
+  const conteo = parseInt(document.getElementById('countQty').value,10);
+  if(isNaN(conteo)){ showToast('Ingresa una cantidad válida'); return; }
+  const diferencia = conteo - product.stock;
+  state.inventoryCounts[state.currentZone][product.sku] = {
+    sku: product.sku, desc: product.desc, ubicacion: product.ubicacion,
+    stockSistema: product.stock, conteo, diferencia, usuario: state.userName, ts: new Date().toLocaleTimeString('es-PE')
+  };
+  document.getElementById('inventoryResultZone').innerHTML='';
+  showToast(diferencia===0 ? `✓ ${product.sku} sin diferencia` : `⚠ ${product.sku} diferencia: ${diferencia>0?'+':''}${diferencia}`);
+  renderInventoryLists();
+}
+
+function renderInventoryLists(){
+  if(!state.currentZone){ return; }
+  const zoneProducts = state.products.filter(p=>p.zona===state.currentZone);
+  const counted = state.inventoryCounts[state.currentZone] || {};
+  const pending = zoneProducts.filter(p=> !counted[p.sku]);
+
+  document.getElementById('pendingCount').textContent = pending.length;
+  document.getElementById('countedCount').textContent = Object.keys(counted).length;
+  document.getElementById('inventoryBottomBar').style.display = Object.keys(counted).length ? 'block' : 'none';
+
+  const pendWrap = document.getElementById('pendingList');
+  pendWrap.innerHTML = pending.length ? pending.map(p=>`
+    <div class="list-item">
+      <div class="li-left">
+        <div class="sku">${escapeHtml(p.sku)}</div>
+        <div class="desc">${escapeHtml(p.desc)}</div>
+        <div class="meta">${escapeHtml(p.ubicacion)}</div>
+      </div>
+      <div class="li-right" style="color:var(--steel); font-size:11px;">Sistema<br>${p.stock}</div>
+    </div>`).join('') : `<div class="empty-state"><div class="em-icon">✓</div><p>Todos los productos de esta zona ya fueron contados.</p></div>`;
+
+  const list = Object.values(counted);
+  const cWrap = document.getElementById('countedList');
+  cWrap.innerHTML = list.length ? list.slice().reverse().map(it=>`
+    <div class="list-item ${it.diferencia===0?'diff-ok':'diff-bad'}">
+      <div class="li-left">
+        <div class="sku">${escapeHtml(it.sku)}</div>
+        <div class="desc">${escapeHtml(it.desc)}</div>
+        <span class="diff-badge ${it.diferencia===0?'ok':'bad'}">${it.diferencia===0?'Coincide':(it.diferencia>0?'+':'')+it.diferencia+' und'}</span>
+      </div>
+      <div class="li-right">${it.conteo}<span class="u">sist. ${it.stockSistema}</span></div>
+    </div>`).join('') : `<div class="empty-state"><p>Sin conteos registrados todavía.</p></div>`;
+}
+
+function exportInventoryReport(){
+  const counted = state.inventoryCounts[state.currentZone] || {};
+  const list = Object.values(counted);
+  if(!list.length){ showToast('No hay conteos para exportar'); return; }
+  const rows = list.map(it=>({
+    Zona: state.currentZone, SKU: it.sku, Descripcion: it.desc, Ubicacion: it.ubicacion,
+    StockSistema: it.stockSistema, ConteoFisico: it.conteo, Diferencia: it.diferencia,
+    Estado: it.diferencia===0 ? 'OK' : (it.diferencia>0 ? 'SOBRANTE' : 'FALTANTE'),
+    Almacenero: it.usuario, Hora: it.ts
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+  const fname = `inventario_${state.currentZone.replace(/\s+/g,'_')}_${dateStamp()}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  showToast('Reporte exportado: ' + fname);
+}
+
+/* ============================================================
+   UTILS
+=============================================================*/
+function escapeHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(s){ return escapeHtml(s).replace(/'/g,"\\'"); }
+function dateStamp(){ const d=new Date(); return d.toISOString().slice(0,10); }
+
+goTo('login');
+</script>
+</body>
+</html>
