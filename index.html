@@ -6,6 +6,7 @@
 <title>Almacén · Picking &amp; Inventario</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
 <style>
   :root{
     --ink:#1C1E22;
@@ -124,13 +125,13 @@
   .scan-launch p{color:#B8BCC2; font-size:12.5px; margin:10px 0 16px; font-family:var(--mono);}
   #scanner-viewport{
     width:100%; border-radius:14px; overflow:hidden; position:relative; background:#000;
-    margin-bottom:14px; display:none; aspect-ratio: 3/4;
+    margin-bottom:14px; display:none; aspect-ratio: 4/3;
   }
   #scanner-viewport.active{display:block;}
   #scanner-viewport video, #scanner-viewport canvas{width:100% !important; height:100% !important; object-fit:cover;}
   .scan-frame{
     position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    width:92%; height:60%; border:2.5px solid var(--amber); border-radius:8px; pointer-events:none;
+    width:78%; height:32%; border:2.5px solid var(--amber); border-radius:8px; pointer-events:none;
     box-shadow:0 0 0 999px rgba(0,0,0,0.35);
   }
   .scan-close{
@@ -233,6 +234,105 @@
   .upload-box .fname{font-family:var(--mono); font-size:12.5px; color:var(--success); font-weight:700; margin-top:8px;}
 
   .col-hint{font-family:var(--mono); font-size:11px; color:var(--steel); background:var(--card); border:1px solid var(--steel-line); border-radius:8px; padding:10px 12px; margin-bottom:16px; line-height:1.6;}
+
+  /* ---------- Producción / Lotes ---------- */
+  select{
+    width:100%; padding:14px 14px; border-radius:10px; border:1.5px solid var(--steel-line);
+    background:var(--card); font-size:16px; font-family:var(--sans); color:var(--ink); appearance:none;
+  }
+  .field-block{margin-bottom:14px;}
+
+  .label-preview{
+    background:#fff; border:2px solid var(--ink); border-radius:6px; padding:18px 16px;
+    text-align:center; margin:18px 0 14px;
+  }
+  .label-preview .lp-company{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--steel); margin-bottom:6px;}
+  .label-preview .lp-desc{font-size:13px; font-weight:700; margin:0 0 2px; line-height:1.3;}
+  .label-preview .lp-meta{font-family:var(--mono); font-size:10.5px; color:var(--steel); margin-bottom:10px;}
+  .label-preview svg{max-width:100%;}
+  .label-preview .lp-code{font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:1px; margin-top:4px;}
+
+  .lote-item{
+    background:var(--card); border:1px solid var(--steel-line); border-left:4px solid var(--amber);
+    border-radius:10px; padding:12px 14px; margin-bottom:8px;
+  }
+  .lote-item .lt-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;}
+  .lote-item .sku{font-family:var(--mono); font-weight:700; font-size:13.5px;}
+  .lote-item .desc{font-size:11.5px; color:var(--steel); margin-top:2px;}
+  .lote-item .meta-row{display:flex; gap:14px; font-family:var(--mono); font-size:10.5px; color:var(--steel); margin-top:6px;}
+  .lote-item .meta-row b{color:var(--ink); font-weight:700;}
+  .lote-item .btn-print-small{
+    background:var(--ink); color:var(--amber); border:none; border-radius:7px; padding:7px 12px;
+    font-size:11px; font-family:var(--mono); font-weight:700; cursor:pointer; flex-shrink:0;
+  }
+
+  .maquina-badge{
+    display:inline-flex; align-items:center; gap:5px; background:var(--ink); color:var(--amber);
+    font-family:var(--mono); font-size:11px; font-weight:700; padding:5px 10px; border-radius:20px; margin-top:8px;
+  }
+
+  #printArea{display:none;}
+  @media print{
+    @page{ size:auto; margin:10mm; }
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{
+      display:block; position:fixed; top:0; left:0; width:90mm; padding:6mm; text-align:center;
+    }
+    #printArea svg{ width:80mm !important; height:auto !important; }
+  }
+
+  /* ---------- Layout de almacén ---------- */
+  .layout-banner{
+    background:var(--ink); color:var(--paper); border-radius:10px; padding:12px 14px; margin-bottom:16px;
+    font-size:12px; line-height:1.5; border-left:4px solid var(--amber);
+  }
+  .layout-banner b{color:var(--amber);}
+
+  .layout-summary{display:flex; gap:8px; margin-bottom:18px;}
+  .layout-summary .ls-card{flex:1; background:var(--card); border:1.5px solid var(--steel-line); border-radius:10px; padding:12px 10px; text-align:center;}
+  .layout-summary .ls-card .num{display:block; font-family:var(--mono); font-size:19px; font-weight:700;}
+  .layout-summary .ls-card .lbl{font-size:9.5px; text-transform:uppercase; color:var(--steel); letter-spacing:.4px;}
+
+  .dock-marker{
+    text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--steel);
+    padding:8px; border:1.5px dashed var(--steel-line); border-radius:8px; margin-bottom:14px;
+    text-transform:uppercase; letter-spacing:1px;
+  }
+
+  .zone-section{margin-bottom:22px;}
+  .zone-header{
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  }
+  .zone-badge{
+    width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; font-size:13px; color:#fff; flex-shrink:0;
+  }
+  .zone-badge.zone-A{background:var(--alert);}
+  .zone-badge.zone-B{background:var(--amber-dark);}
+  .zone-badge.zone-C{background:var(--success);}
+  .zone-header h4{margin:0; font-size:13px; font-weight:700;}
+  .zone-header .zh-sub{font-size:10.5px; color:var(--steel); font-family:var(--mono);}
+
+  .pallet-grid{display:flex; flex-wrap:wrap; gap:6px;}
+  .pallet-block{
+    background:var(--card); border:1.5px solid var(--steel-line); border-radius:7px;
+    padding:8px 9px; min-width:78px; flex:1 1 78px; max-width:110px;
+  }
+  .pallet-block.zone-A{border-top:3px solid var(--alert);}
+  .pallet-block.zone-B{border-top:3px solid var(--amber-dark);}
+  .pallet-block.zone-C{border-top:3px solid var(--success);}
+  .pallet-block .pb-sku{font-family:var(--mono); font-weight:700; font-size:11px;}
+  .pallet-block .pb-desc{font-size:9px; color:var(--steel); line-height:1.25; margin:2px 0 5px; height:22px; overflow:hidden;}
+  .pallet-block .pb-pallets{
+    font-family:var(--mono); font-size:10px; font-weight:700; color:var(--ink);
+    background:var(--paper); border-radius:4px; padding:2px 5px; display:inline-block;
+  }
+
+  .pending-list-toggle{
+    text-align:center; font-size:12px; color:var(--steel); text-decoration:underline; cursor:pointer;
+    margin-top:6px; font-family:var(--mono);
+  }
 </style>
 </head>
 <body>
@@ -265,24 +365,41 @@
 
   <!-- ============ SCREEN: UPLOAD EXCEL ============ -->
   <div class="screen hidden" id="screen-upload">
-    <div class="eyebrow">Paso 1 de 1</div>
+    <div class="eyebrow">Base de productos</div>
     <h2 class="title">Cargar base de productos</h2>
-    <p class="help">Sube el Excel (.xlsx) con las columnas: <b>SKU, Descripción, Ubicación, Zona, Stock</b>. Esta será la data de prueba para picking e inventario.</p>
 
-    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
-      <div class="up-icon">📄</div>
-      <p><b>Toca para elegir archivo</b></p>
-      <p>Formato .xlsx</p>
-      <div class="fname" id="fileName"></div>
+    <div id="existingFileBlock" style="display:none;">
+      <div class="tag-card" style="margin-bottom:16px;">
+        <div class="tag-inner">
+          <p class="tag-desc" style="margin-bottom:10px;">Ya hay una base guardada en este celular:</p>
+          <div class="tag-grid">
+            <div class="tag-cell"><span class="k">Productos</span><span class="v" id="existingFileCount">0</span></div>
+            <div class="tag-cell"><span class="k">Cargado el</span><span class="v" id="existingFileDate" style="font-size:12px;">—</span></div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-amber" onclick="useExistingFile()">Usar archivo existente</button>
+      <button class="btn btn-outline" style="margin-top:10px;" onclick="showUploadBlock()">Actualizar archivo (subir uno nuevo)</button>
     </div>
-    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none;" onchange="handleFileUpload(event)">
 
-    <div class="col-hint">
-      Columnas esperadas (exactas o similares):<br>
-      SKU · Descripción · Ubicación · Zona · Stock
+    <div id="uploadBlock">
+      <p class="help">Sube el Excel (.xlsx) con las columnas: <b>SKU, Descripción, Ubicación, Zona, Stock</b>.</p>
+
+      <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+        <div class="up-icon">📄</div>
+        <p><b>Toca para elegir archivo</b></p>
+        <p>Formato .xlsx</p>
+        <div class="fname" id="fileName"></div>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none;" onchange="handleFileUpload(event)">
+
+      <div class="col-hint">
+        Columnas esperadas (exactas o similares):<br>
+        SKU · Descripción · Ubicación · Zona · Stock
+      </div>
+
+      <button class="btn btn-primary" id="btnUseSample" onclick="loadSampleData()">Usar data de ejemplo (probar sin Excel)</button>
     </div>
-
-    <button class="btn btn-primary" id="btnUseSample" onclick="loadSampleData()">Usar data de ejemplo (probar sin Excel)</button>
   </div>
 
   <!-- ============ SCREEN: MENU ============ -->
@@ -298,6 +415,23 @@
       <div><span class="num" id="statPicks">0</span><span class="lbl">Picks hoy</span></div>
       <div class="divider"></div>
       <div><span class="num" id="statCounts">0</span><span class="lbl">Conteos</span></div>
+      <div class="divider"></div>
+      <div><span class="num" id="statLotes">0</span><span class="lbl">Lotes hoy</span></div>
+    </div>
+
+    <div class="mode-card" onclick="goTo('layout')">
+      <div class="mode-icon">▦</div>
+      <div><h3>Layout de Almacén</h3><p>Mapa visual de bloques por zona ABC — prototipo</p></div>
+    </div>
+
+    <div class="mode-card" onclick="goTo('produccion')">
+      <div class="mode-icon">⚙</div>
+      <div><h3>Producción</h3><p>Registra un lote nuevo y genera su código de barras para imprimir</p></div>
+    </div>
+
+    <div class="mode-card" onclick="goTo('ingresos')">
+      <div class="mode-icon">▼</div>
+      <div><h3>Ingreso de Producción</h3><p>Recibe y confirma lo producido en planta contra el registro de producción</p></div>
     </div>
 
     <div class="mode-card" onclick="goTo('picking')">
@@ -311,6 +445,137 @@
     </div>
 
     <button class="btn btn-outline" style="margin-top:6px;" onclick="goTo('upload')">Cambiar base de productos (Excel)</button>
+    <button class="btn btn-outline" style="margin-top:10px;" onclick="exportStockSnapshot()">Actualizar stock para Producción/Ventas</button>
+    <button class="btn btn-outline" style="margin-top:10px; opacity:.75;" onclick="goTo('githubConfig')">⚙ Configurar publicación automática</button>
+  </div>
+
+  <!-- ============ SCREEN: GITHUB CONFIG ============ -->
+  <div class="screen hidden" id="screen-githubConfig">
+    <div class="eyebrow">Configuración (una sola vez)</div>
+    <h2 class="title">Publicación automática</h2>
+    <p class="help">Con esto, el botón "Actualizar stock" sube el archivo directo a tu repositorio de GitHub — sin que tengas que entrar a la web y subirlo a mano cada vez.</p>
+
+    <div class="field-block">
+      <label class="field-label">Usuario de GitHub</label>
+      <input type="text" id="ghOwner" placeholder="Ej. saulvilchez74-dotcom">
+    </div>
+    <div class="field-block">
+      <label class="field-label">Nombre del repositorio</label>
+      <input type="text" id="ghRepo" placeholder="Ej. bartori-almacen">
+    </div>
+    <div class="field-block">
+      <label class="field-label">Token de acceso personal</label>
+      <input type="text" id="ghToken" placeholder="ghp_...">
+    </div>
+
+    <div class="col-hint">
+      ¿No tienes un token? Ve a github.com → foto de perfil → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token. Dale acceso solo a este repositorio, con permiso "Contents: Read and write". Cópialo y pégalo arriba (solo se guarda en este celular).
+    </div>
+
+    <button class="btn btn-amber" onclick="saveGithubConfig()">Guardar configuración</button>
+    <button class="btn btn-outline" style="margin-top:10px;" onclick="goTo('menu')">Volver al menú</button>
+  </div>
+
+  <!-- ============ SCREEN: LAYOUT ============ -->
+  <div class="screen hidden" id="screen-layout">
+    <div class="eyebrow">Layout de Almacén</div>
+    <h2 class="title">Mapa de bloques (prototipo)</h2>
+
+    <div class="layout-banner">
+      <b>⚠ Prototipo de prueba.</b> Calculado con datos aproximados (pallet 1.50×1.50m, cajas/pallet según tipo). Pendiente confirmar dimensiones reales del almacén, altura de techo y disposición exacta de pasillos.
+    </div>
+
+    <div class="layout-summary">
+      <div class="ls-card"><span class="num" id="layoutTotalPallets">0</span><span class="lbl">Pallets</span></div>
+      <div class="ls-card"><span class="num" id="layoutTotalArea">0</span><span class="lbl">m² estimados</span></div>
+      <div class="ls-card"><span class="num" id="layoutPending">0</span><span class="lbl">Sin clasificar</span></div>
+    </div>
+
+    <div class="dock-marker">▼ Puerta de despacho / ingreso ▼</div>
+
+    <div id="layoutZones"></div>
+
+    <div class="pending-list-toggle" onclick="togglePendingList()">Ver productos sin clasificar (tipo de caja pendiente)</div>
+    <div id="pendingClassifyList" style="display:none; margin-top:12px;"></div>
+  </div>
+
+  <!-- ============ SCREEN: PRODUCCIÓN ============ -->
+  <div class="screen hidden" id="screen-produccion">
+    <div class="eyebrow">Producción</div>
+    <h2 class="title">Registrar nuevo lote</h2>
+    <p class="help">Cada vez que arranca una producción, regístrala aquí. Se genera un código de barras único para ese lote — imprímelo y pégalo en las cajas.</p>
+
+    <div class="field-block">
+      <label class="field-label">Producto (SKU)</label>
+      <select id="loteSku"></select>
+    </div>
+    <div class="field-block">
+      <label class="field-label">N° de Lote</label>
+      <input type="text" id="loteNumero" placeholder="Ej. 045">
+    </div>
+    <div class="field-block">
+      <label class="field-label">Cantidad producida (unidades)</label>
+      <input type="number" id="loteCantidad" placeholder="Ej. 5000">
+    </div>
+    <div class="field-block">
+      <label class="field-label">Máquina</label>
+      <input type="text" id="loteMaquina" placeholder="Ej. Máquina 3" list="maquinasList">
+      <datalist id="maquinasList"></datalist>
+    </div>
+    <div class="field-block">
+      <label class="field-label">Fecha de producción</label>
+      <input type="text" id="loteFecha" placeholder="dd/mm/aaaa">
+    </div>
+
+    <button class="btn btn-amber" onclick="registrarLote()">Generar código de barras</button>
+
+    <div id="labelPreviewZone"></div>
+
+    <div class="section-head" style="margin-top:24px;">
+      <h3>Lotes registrados hoy</h3>
+      <span class="count" id="lotesCount">0</span>
+    </div>
+    <div id="lotesList"></div>
+  </div>
+
+  <!-- ============ SCREEN: INGRESO DE PRODUCCIÓN ============ -->
+  <div class="screen hidden" id="screen-ingresos">
+    <div class="eyebrow">Ingreso de Producción</div>
+    <h2 class="title">Confirmar recojo de producción</h2>
+    <p class="help">Escanea el código de cada lote que recojas de planta. La app compara la cantidad producida (registrada por Producción) contra lo que cuentas físicamente, y verifica que máquina, fecha y producto coincidan.</p>
+
+    <div class="scan-launch" id="scanLaunchIngresos">
+      <div style="color:var(--amber); font-size:28px;">▣</div>
+      <p>Escanea el código del lote a recibir</p>
+      <button class="btn btn-amber" onclick="startScanner('ingresos')">Iniciar cámara</button>
+    </div>
+
+    <div id="scanner-viewport-ingresos" class="scanner-viewport-slot"></div>
+    <div class="manual-toggle" onclick="toggleManual('ingresos')">o ingresar código manualmente</div>
+    <div id="manualEntryIngresos" style="display:none; margin-bottom:16px;">
+      <div class="btn-row">
+        <input type="text" id="manualCodeIngresos" placeholder="Código de lote">
+        <button class="btn btn-primary" style="flex:0 0 auto; width:90px;" onclick="lookupManual('ingresos')">Buscar</button>
+      </div>
+    </div>
+
+    <div id="ingresoResultZone"></div>
+
+    <div class="section-head">
+      <h3>Lotes pendientes de confirmar</h3>
+      <span class="count" id="ingresosPendingCount">0</span>
+    </div>
+    <div id="ingresosPendingList"></div>
+
+    <div class="section-head" style="margin-top:18px;">
+      <h3>Confirmados</h3>
+      <span class="count" id="ingresosConfirmedCount">0</span>
+    </div>
+    <div id="ingresosConfirmedList"></div>
+
+    <div class="bottom-bar" id="ingresosBottomBar" style="display:none;">
+      <button class="btn btn-primary" onclick="exportIngresosReport()">Exportar reporte de ingresos</button>
+    </div>
   </div>
 
   <!-- ============ SCREEN: PICKING ============ -->
@@ -359,7 +624,7 @@
     <div class="eyebrow" id="invZoneLabel">Zona</div>
     <h2 class="title">Conteo físico</h2>
 
-    <div class="scan-launch" id="scanLaunchInv">
+    <div class="scan-launch" id="scanLaunchInventory">
       <div style="color:var(--amber); font-size:28px;">▣</div>
       <p>Escanea el producto a contar en esta zona</p>
       <button class="btn btn-amber" onclick="startScanner('inventory')">Iniciar cámara</button>
@@ -396,6 +661,7 @@
 </div>
 
 <div id="toast"></div>
+<div id="printArea"></div>
 
 <script>
 /* ============================================================
@@ -406,6 +672,9 @@ let state = {
   products: [],          // {sku, desc, ubicacion, zona, stock}
   productIndex: {},      // sku(lowercase) -> product
   pickingList: [],        // {sku, desc, ubicacion, cantidad, ts}
+  lotes: {},              // fullCode ("SKU-LOTE") -> {sku, lote, cantidad, maquina, fecha, ts}
+  ingresos: {},            // fullCode -> {..lote info, cantidadContada, diferencia, ts}
+  maquinasUsadas: [],      // for datalist autocomplete
   currentZone: null,
   inventoryCounts: {},    // zona -> { sku: {sku,desc,ubicacion,stockSistema,conteo,diferencia,ts} }
   scannerActiveFor: null, // 'picking' | 'inventory' | null
@@ -420,12 +689,17 @@ function goTo(screen){
   document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
   document.getElementById('screen-'+screen).classList.remove('hidden');
   document.getElementById('topbar').style.display = screen==='login' ? 'none' : 'flex';
-  const titles = {upload:'Cargar base', menu:'Menú principal', picking:'Picking', zoneSelect:'Inventario', inventory:'Conteo físico'};
+  const titles = {upload:'Cargar base', menu:'Menú principal', picking:'Picking', zoneSelect:'Inventario', inventory:'Conteo físico', produccion:'Producción', layout:'Layout de Almacén', ingresos:'Ingreso de Producción', githubConfig:'Configuración'};
   document.getElementById('topbarTitle').textContent = titles[screen] || 'Almacén';
+  if(screen==='upload') checkStoredFile();
   if(screen==='menu') renderMenuStats();
   if(screen==='zoneSelect') renderZoneChips();
   if(screen==='picking') renderPickingList();
   if(screen==='inventory') renderInventoryLists();
+  if(screen==='produccion'){ populateLoteSkuSelect(); renderLotesList(); setDefaultLoteFecha(); }
+  if(screen==='layout') renderLayout();
+  if(screen==='ingresos') renderIngresosLists();
+  if(screen==='githubConfig') prefillGithubConfig();
 }
 
 function showToast(msg){
@@ -490,6 +764,10 @@ function parseProductRows(rows){
   const kUbi = findKey(['ubicacion','ubicacion fisica','rack','posicion']);
   const kZona = findKey(['zona','area']);
   const kStock = findKey(['stock','cantidad','existencia']);
+  const kAbc = findKey(['clasificacion abc','abc','clase']);
+  const kCategoria = findKey(['categoria de caja','categoria caja','categoria']);
+  const kPallets = findKey(['pallets necesarios','pallets']);
+  const kArea = findKey(['area requerida (m2)','area requerida','area m2','area']);
 
   if(!kSku){ showToast('No se encontró columna de SKU/Código'); return; }
 
@@ -501,7 +779,11 @@ function parseProductRows(rows){
       desc: kDesc ? (r[kDesc]||'').toString().trim() : '(sin descripción)',
       ubicacion: kUbi ? (r[kUbi]||'').toString().trim() : '—',
       zona: kZona ? (r[kZona]||'').toString().trim() : 'General',
-      stock: kStock ? Number(r[kStock])||0 : 0
+      stock: kStock ? Number(r[kStock])||0 : 0,
+      abc: kAbc ? (r[kAbc]||'').toString().trim().toUpperCase() : '',
+      categoria: kCategoria ? (r[kCategoria]||'').toString().trim() : '',
+      pallets: kPallets && r[kPallets]!=='' ? Number(r[kPallets])||0 : null,
+      area: kArea && r[kArea]!=='' ? Number(r[kArea])||0 : null
     });
   });
 
@@ -531,7 +813,56 @@ function applyProducts(products){
   products.forEach(p=> state.productIndex[p.sku.toLowerCase()] = p);
   document.getElementById('fileName').textContent = products.length + ' productos cargados ✓';
   showToast(products.length + ' productos cargados correctamente');
+  saveProductsToStorage(products);
   setTimeout(()=> goTo('menu'), 500);
+}
+
+/* ---------------- Persistencia local (localStorage) ---------------- */
+const STORAGE_KEY = 'bartori_almacen_productos_v1';
+
+function saveProductsToStorage(products){
+  try{
+    const payload = { products, savedAt: new Date().toLocaleString('es-PE') };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }catch(e){ console.warn('No se pudo guardar en localStorage', e); }
+}
+
+function loadProductsFromStorageRaw(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){ return null; }
+}
+
+function checkStoredFile(){
+  const stored = loadProductsFromStorageRaw();
+  const existingBlock = document.getElementById('existingFileBlock');
+  const uploadBlock = document.getElementById('uploadBlock');
+  if(stored && stored.products && stored.products.length){
+    document.getElementById('existingFileCount').textContent = stored.products.length;
+    document.getElementById('existingFileDate').textContent = stored.savedAt || '—';
+    existingBlock.style.display = 'block';
+    uploadBlock.style.display = 'none';
+  } else {
+    existingBlock.style.display = 'none';
+    uploadBlock.style.display = 'block';
+  }
+}
+
+function useExistingFile(){
+  const stored = loadProductsFromStorageRaw();
+  if(!stored || !stored.products || !stored.products.length){
+    showToast('No hay archivo guardado. Sube uno nuevo.');
+    showUploadBlock();
+    return;
+  }
+  applyProducts(stored.products);
+}
+
+function showUploadBlock(){
+  document.getElementById('existingFileBlock').style.display = 'none';
+  document.getElementById('uploadBlock').style.display = 'block';
 }
 
 /* ============================================================
@@ -545,11 +876,149 @@ function renderMenuStats(){
   let totalCounts = 0;
   Object.values(state.inventoryCounts).forEach(z=> totalCounts += Object.keys(z).length);
   document.getElementById('statCounts').textContent = totalCounts;
+  document.getElementById('statLotes').textContent = Object.keys(state.lotes).length;
+}
+
+/* ============================================================
+   PRODUCCIÓN / LOTES
+=============================================================*/
+function setDefaultLoteFecha(){
+  const inp = document.getElementById('loteFecha');
+  if(!inp.value){
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    inp.value = `${dd}/${mm}/${d.getFullYear()}`;
+  }
+}
+
+function populateLoteSkuSelect(){
+  const sel = document.getElementById('loteSku');
+  if(!state.products.length){
+    sel.innerHTML = '<option value="">-- Sube primero tu Excel de productos --</option>';
+    return;
+  }
+  sel.innerHTML = state.products.map(p=>
+    `<option value="${escapeAttr(p.sku)}">${escapeHtml(p.sku)} — ${escapeHtml(p.desc)}</option>`
+  ).join('');
+
+  // Autocomplete de máquinas ya usadas
+  const dl = document.getElementById('maquinasList');
+  dl.innerHTML = state.maquinasUsadas.map(m=>`<option value="${escapeAttr(m)}">`).join('');
+}
+
+function sanitizeCodePart(s){
+  return (s||'').toString().trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+
+function registrarLote(){
+  const sku = document.getElementById('loteSku').value;
+  const loteNum = document.getElementById('loteNumero').value.trim();
+  const cantidad = parseInt(document.getElementById('loteCantidad').value, 10);
+  const maquina = document.getElementById('loteMaquina').value.trim();
+  const fecha = document.getElementById('loteFecha').value.trim();
+
+  if(!sku){ showToast('Selecciona un producto'); return; }
+  if(!loteNum){ showToast('Ingresa el número de lote'); return; }
+  if(isNaN(cantidad) || cantidad<=0){ showToast('Ingresa la cantidad producida'); return; }
+  if(!maquina){ showToast('Ingresa la máquina'); return; }
+
+  const product = state.productIndex[sku.toLowerCase()];
+  const fullCode = sanitizeCodePart(sku) + '-' + sanitizeCodePart(loteNum);
+
+  state.lotes[fullCode] = {
+    sku: product.sku, desc: product.desc, lote: loteNum, cantidad, maquina, fecha,
+    fullCode, ts: new Date().toLocaleTimeString('es-PE')
+  };
+
+  if(!state.maquinasUsadas.includes(maquina)) state.maquinasUsadas.push(maquina);
+
+  renderLabelPreview(fullCode);
+  renderLotesList();
+  showToast(`✓ Lote registrado: ${fullCode}`);
+}
+
+function renderLabelPreview(fullCode){
+  const lote = state.lotes[fullCode];
+  const zone = document.getElementById('labelPreviewZone');
+  zone.innerHTML = `
+    <div class="label-preview" id="labelToPrint-${cssSafe(fullCode)}">
+      <div class="lp-company">Bartori S.A.C.</div>
+      <p class="lp-desc">${escapeHtml(lote.desc)}</p>
+      <div class="lp-meta">SKU ${escapeHtml(lote.sku)} · Lote ${escapeHtml(lote.lote)} · ${escapeHtml(lote.maquina)} · ${escapeHtml(lote.fecha)}</div>
+      <div class="lp-meta">Cantidad producida: <b>${lote.cantidad}</b> und</div>
+      <svg id="barcode-${cssSafe(fullCode)}"></svg>
+      <div class="lp-code">${escapeHtml(fullCode)}</div>
+    </div>
+    <button class="btn btn-primary" onclick="printLabel('${escapeAttr(fullCode)}')">Imprimir etiqueta</button>
+  `;
+  drawBarcode(fullCode);
+}
+
+function cssSafe(s){ return s.replace(/[^A-Za-z0-9]/g,'_'); }
+
+function drawBarcode(fullCode, targetId){
+  const svgId = targetId || ('barcode-' + cssSafe(fullCode));
+  try{
+    JsBarcode('#' + svgId, fullCode, {
+      format:'CODE128', width:3, height:80, displayValue:false, margin:14
+    });
+  }catch(e){ console.error('Barcode error', e); }
+}
+
+function renderLotesList(){
+  const list = Object.values(state.lotes);
+  document.getElementById('lotesCount').textContent = list.length;
+  const wrap = document.getElementById('lotesList');
+  if(!list.length){
+    wrap.innerHTML = `<div class="empty-state"><p>Aún no registras lotes hoy.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = list.slice().reverse().map(l=>`
+    <div class="lote-item">
+      <div class="lt-top">
+        <div>
+          <div class="sku">${escapeHtml(l.sku)} · Lote ${escapeHtml(l.lote)}</div>
+          <div class="desc">${escapeHtml(l.desc)}</div>
+        </div>
+        <button class="btn-print-small" onclick="reprintLote('${escapeAttr(l.fullCode)}')">Imprimir</button>
+      </div>
+      <div class="meta-row">
+        <span>Máquina: <b>${escapeHtml(l.maquina)}</b></span>
+        <span>Cant: <b>${l.cantidad}</b></span>
+        <span>${escapeHtml(l.fecha)}</span>
+      </div>
+    </div>`).join('');
+}
+
+function reprintLote(fullCode){
+  renderLabelPreview(fullCode);
+  document.getElementById('labelPreviewZone').scrollIntoView({behavior:'smooth'});
+}
+
+function printLabel(fullCode){
+  const lote = state.lotes[fullCode];
+  const printArea = document.getElementById('printArea');
+  printArea.innerHTML = `
+    <div style="text-align:center; font-family:Arial,sans-serif;">
+      <div style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#555;">Bartori S.A.C.</div>
+      <div style="font-size:15px; font-weight:700; margin:4px 0;">${escapeHtml(lote.desc)}</div>
+      <div style="font-size:11px; color:#333; margin-bottom:8px;">SKU ${escapeHtml(lote.sku)} · Lote ${escapeHtml(lote.lote)} · ${escapeHtml(lote.maquina)} · ${escapeHtml(lote.fecha)}</div>
+      <svg id="printBarcode"></svg>
+      <div style="font-family:monospace; font-size:12px; font-weight:700; margin-top:4px;">${escapeHtml(fullCode)}</div>
+    </div>`;
+  JsBarcode('#printBarcode', fullCode, { format:'CODE128', width:3.2, height:90, displayValue:false, margin:16 });
+  setTimeout(()=> window.print(), 150);
 }
 
 /* ============================================================
    SCANNER (Quagga.js)
 =============================================================*/
+function scanLaunchId(target){ return 'scanLaunch' + target.charAt(0).toUpperCase() + target.slice(1); }
+function resultZoneId(target){
+  return { picking:'pickingResultZone', inventory:'inventoryResultZone', ingresos:'ingresoResultZone' }[target];
+}
+
 function startScanner(target){
   // 1) Secure-context check — camera APIs only work on https:// or localhost
   if(!window.isSecureContext){
@@ -562,7 +1031,7 @@ function startScanner(target){
   }
 
   state.scannerActiveFor = target;
-  const launchId = target==='picking' ? 'scanLaunchPicking' : 'scanLaunchInv';
+  const launchId = scanLaunchId(target);
   document.getElementById(launchId).style.display='none';
 
   // 2) Ask for camera permission OURSELVES first, so we get the real error
@@ -587,7 +1056,7 @@ function startScanner(target){
 }
 
 function showScanError(target, msg){
-  const zone = document.getElementById(target==='picking' ? 'pickingResultZone' : 'inventoryResultZone');
+  const zone = document.getElementById(resultZoneId(target));
   zone.innerHTML = `<div class="not-found">⚠ ${escapeHtml(msg)}</div>`;
   showToast('No se pudo iniciar la cámara');
 }
@@ -599,11 +1068,13 @@ function launchQuagga(target){
   Quagga.init({
     inputStream:{
       name:'Live', type:'LiveStream', target: document.getElementById('scanner-viewport'),
-      constraints:{ facingMode:'environment', width:{ideal:720}, height:{ideal:960} }
+      constraints:{ facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }
     },
-    decoder:{ readers:['code_128_reader','ean_reader','ean_8_reader','upc_reader','code_39_reader'] },
+    decoder:{ readers:['code_128_reader'], multiple:false },
     locate:true,
-    locator:{ patchSize:'medium', halfSample:true }
+    locator:{ patchSize:'medium', halfSample:false },
+    frequency: 10,
+    numOfWorkers: (navigator.hardwareConcurrency || 4)
   }, function(err){
     if(err){
       console.error(err);
@@ -646,22 +1117,22 @@ function patchVideoForMobile(){
 
 function stopScanner(){
   try{ Quagga.offDetected(); Quagga.stop(); }catch(e){}
-  ['picking','inventory'].forEach(t=>{
+  ['picking','inventory','ingresos'].forEach(t=>{
     const slot = document.getElementById('scanner-viewport-'+t);
     if(slot) slot.innerHTML='';
-    const launch = document.getElementById(t==='picking' ? 'scanLaunchPicking' : 'scanLaunchInv');
+    const launch = document.getElementById(scanLaunchId(t));
     if(launch) launch.style.display='block';
   });
   state.scannerActiveFor = null;
 }
 
 function toggleManual(target){
-  const el = document.getElementById('manualEntry' + (target==='picking'?'Picking':'Inventory'));
+  const el = document.getElementById('manualEntry' + target.charAt(0).toUpperCase() + target.slice(1));
   el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
 
 function lookupManual(target){
-  const input = document.getElementById('manualCode' + (target==='picking'?'Picking':'Inventory'));
+  const input = document.getElementById('manualCode' + target.charAt(0).toUpperCase() + target.slice(1));
   const code = input.value.trim();
   if(!code){ showToast('Ingresa un código'); return; }
   handleScanResult(code, target);
@@ -672,26 +1143,43 @@ function lookupManual(target){
    SCAN RESULT HANDLING
 =============================================================*/
 function handleScanResult(code, target){
-  const product = state.productIndex[code.toLowerCase()];
-  if(target==='picking') renderPickingResult(product, code);
-  if(target==='inventory') renderInventoryResult(product, code);
+  const rawCode = code.trim();
+  let product = null, loteInfo = null;
+
+  // 1) ¿Es un código de lote registrado (SKU-LOTE)?
+  const loteMatch = state.lotes[rawCode.toUpperCase()];
+  if(loteMatch){
+    loteInfo = loteMatch;
+    product = state.productIndex[loteMatch.sku.toLowerCase()];
+  } else {
+    // 2) ¿Es un SKU simple?
+    product = state.productIndex[rawCode.toLowerCase()];
+  }
+
+  if(target==='picking') renderPickingResult(product, rawCode, loteInfo);
+  if(target==='inventory') renderInventoryResult(product, rawCode, loteInfo);
+  if(target==='ingresos') renderIngresoResult(product, rawCode, loteInfo);
 }
 
 /* ---------------- PICKING ---------------- */
-function renderPickingResult(product, rawCode){
+function renderPickingResult(product, rawCode, loteInfo){
   const zone = document.getElementById('pickingResultZone');
   if(!product){
     zone.innerHTML = `<div class="not-found">⚠ Código "${escapeHtml(rawCode)}" no encontrado en la base de productos</div>`;
     return;
   }
+  const maquinaBadge = loteInfo
+    ? `<div class="maquina-badge">⚙ ${escapeHtml(loteInfo.maquina)} · Lote ${escapeHtml(loteInfo.lote)} · ${escapeHtml(loteInfo.fecha)}</div>`
+    : '';
   zone.innerHTML = `
     <div class="tag-card">
       <div class="tag-corner">EN STOCK</div>
       <div class="tag-inner">
         <p class="tag-sku">${escapeHtml(product.sku)}</p>
         <p class="tag-desc">${escapeHtml(product.desc)}</p>
-        <div class="tag-grid">
-          <div class="tag-cell location"><span class="k">Ubicación</span><span class="v">${escapeHtml(product.ubicacion)}</span></div>
+        ${maquinaBadge}
+        <div class="tag-grid" style="margin-top:${loteInfo?'10px':'0'};">
+          <div class="tag-cell location"><span class="k">Ubicación</span><span class="v">${escapeHtml(product.ubicacion||'—')}</span></div>
           <div class="tag-cell"><span class="k">Stock sistema</span><span class="v">${product.stock}</span></div>
         </div>
         <div class="qty-row">
@@ -759,13 +1247,16 @@ function exportPickingList(){
 
 /* ---------------- INVENTORY ---------------- */
 function renderZoneChips(){
-  const zonas = [...new Set(state.products.map(p=>p.zona))].sort();
+  const zonas = [...new Set(state.products.map(p=> (p.zona||'').trim()))].sort();
   const wrap = document.getElementById('zoneChips');
   if(!zonas.length){
     wrap.innerHTML = `<div class="empty-state"><p>No hay zonas cargadas. Sube primero tu Excel de productos.</p></div>`;
     return;
   }
-  wrap.innerHTML = zonas.map(z=>`<div class="zone-chip" onclick="selectZone('${escapeAttr(z)}')">${escapeHtml(z)}</div>`).join('');
+  wrap.innerHTML = zonas.map(z=>{
+    const label = z ? z : 'Sin zona asignada';
+    return `<div class="zone-chip" onclick="selectZone('${escapeAttr(z)}')">${escapeHtml(label)}</div>`;
+  }).join('');
 }
 
 function selectZone(zona){
@@ -775,7 +1266,7 @@ function selectZone(zona){
   goTo('inventory');
 }
 
-function renderInventoryResult(product, rawCode){
+function renderInventoryResult(product, rawCode, loteInfo){
   const zone = document.getElementById('inventoryResultZone');
   if(!product){
     zone.innerHTML = `<div class="not-found">⚠ Código "${escapeHtml(rawCode)}" no encontrado en la base de productos</div>`;
@@ -785,14 +1276,18 @@ function renderInventoryResult(product, rawCode){
     zone.innerHTML = `<div class="not-found">⚠ ${escapeHtml(product.sku)} pertenece a la zona "${escapeHtml(product.zona)}", no a "${escapeHtml(state.currentZone)}"</div>`;
     return;
   }
+  const maquinaBadge = loteInfo
+    ? `<div class="maquina-badge">⚙ ${escapeHtml(loteInfo.maquina)} · Lote ${escapeHtml(loteInfo.lote)} · ${escapeHtml(loteInfo.fecha)}</div>`
+    : '';
   zone.innerHTML = `
     <div class="tag-card">
       <div class="tag-corner">CONTAR</div>
       <div class="tag-inner">
         <p class="tag-sku">${escapeHtml(product.sku)}</p>
         <p class="tag-desc">${escapeHtml(product.desc)}</p>
-        <div class="tag-grid">
-          <div class="tag-cell location"><span class="k">Ubicación</span><span class="v">${escapeHtml(product.ubicacion)}</span></div>
+        ${maquinaBadge}
+        <div class="tag-grid" style="margin-top:${loteInfo?'10px':'0'};">
+          <div class="tag-cell location"><span class="k">Ubicación</span><span class="v">${escapeHtml(product.ubicacion||'—')}</span></div>
           <div class="tag-cell"><span class="k">Stock sistema</span><span class="v">${product.stock}</span></div>
         </div>
         <label class="field-label" style="margin-top:14px;">Conteo físico real</label>
@@ -866,6 +1361,271 @@ function exportInventoryReport(){
   const fname = `inventario_${state.currentZone.replace(/\s+/g,'_')}_${dateStamp()}.xlsx`;
   XLSX.writeFile(wb, fname);
   showToast('Reporte exportado: ' + fname);
+}
+
+/* ---------------- INGRESO DE PRODUCCIÓN ---------------- */
+function renderIngresoResult(product, rawCode, loteInfo){
+  const zone = document.getElementById('ingresoResultZone');
+  if(!loteInfo){
+    zone.innerHTML = `<div class="not-found">⚠ Código "${escapeHtml(rawCode)}" no corresponde a ningún lote registrado en Producción. Verifica que se haya registrado antes de recogerlo.</div>`;
+    return;
+  }
+  if(state.ingresos[loteInfo.fullCode]){
+    zone.innerHTML = `<div class="not-found">⚠ El lote ${escapeHtml(loteInfo.fullCode)} ya fue confirmado anteriormente.</div>`;
+    return;
+  }
+  zone.innerHTML = `
+    <div class="tag-card">
+      <div class="tag-corner">POR CONFIRMAR</div>
+      <div class="tag-inner">
+        <p class="tag-sku">${escapeHtml(loteInfo.sku)}</p>
+        <p class="tag-desc">${escapeHtml(loteInfo.desc)}</p>
+        <div class="maquina-badge">⚙ ${escapeHtml(loteInfo.maquina)} · Lote ${escapeHtml(loteInfo.lote)} · ${escapeHtml(loteInfo.fecha)}</div>
+        <div class="tag-grid" style="margin-top:10px;">
+          <div class="tag-cell"><span class="k">Cant. en registro</span><span class="v">${loteInfo.cantidad}</span></div>
+          <div class="tag-cell"><span class="k">Producto</span><span class="v" style="font-size:11px;">${escapeHtml(loteInfo.sku)}</span></div>
+        </div>
+        <label class="field-label" style="margin-top:14px;">Cantidad contada físicamente</label>
+        <input type="number" id="ingresoQty" placeholder="Cantidad recogida" value="${loteInfo.cantidad}">
+        <button class="btn btn-amber" style="margin-top:12px;" onclick="confirmIngreso('${escapeAttr(loteInfo.fullCode)}')">Confirmar ingreso</button>
+      </div>
+    </div>`;
+}
+
+function confirmIngreso(fullCode){
+  const loteInfo = state.lotes[fullCode];
+  const contada = parseInt(document.getElementById('ingresoQty').value, 10);
+  if(isNaN(contada)){ showToast('Ingresa una cantidad válida'); return; }
+  const diferencia = contada - loteInfo.cantidad;
+
+  state.ingresos[fullCode] = {
+    ...loteInfo, cantidadContada: contada, diferencia,
+    confirmadoPor: state.userName, ts: new Date().toLocaleTimeString('es-PE')
+  };
+
+  // Suma la cantidad recibida al stock del producto en esta sesión
+  const product = state.productIndex[loteInfo.sku.toLowerCase()];
+  if(product) product.stock += contada;
+
+  document.getElementById('ingresoResultZone').innerHTML='';
+  showToast(diferencia===0 ? `✓ ${loteInfo.sku} coincide exactamente` : `⚠ ${loteInfo.sku} diferencia: ${diferencia>0?'+':''}${diferencia}`);
+  renderIngresosLists();
+}
+
+function renderIngresosLists(){
+  const allLotes = Object.values(state.lotes);
+  const pending = allLotes.filter(l => !state.ingresos[l.fullCode]);
+  const confirmed = Object.values(state.ingresos);
+
+  document.getElementById('ingresosPendingCount').textContent = pending.length;
+  document.getElementById('ingresosConfirmedCount').textContent = confirmed.length;
+  document.getElementById('ingresosBottomBar').style.display = confirmed.length ? 'block' : 'none';
+
+  const pendWrap = document.getElementById('ingresosPendingList');
+  pendWrap.innerHTML = pending.length ? pending.slice().reverse().map(l=>`
+    <div class="list-item">
+      <div class="li-left">
+        <div class="sku">${escapeHtml(l.sku)} · Lote ${escapeHtml(l.lote)}</div>
+        <div class="desc">${escapeHtml(l.desc)}</div>
+        <div class="meta">${escapeHtml(l.maquina)} · ${escapeHtml(l.fecha)}</div>
+      </div>
+      <div class="li-right" style="color:var(--steel); font-size:11px;">Registrado<br>${l.cantidad}</div>
+    </div>`).join('') : `<div class="empty-state"><p>No hay lotes pendientes de recojo. Todos confirmados o aún no se registró producción nueva.</p></div>`;
+
+  const confWrap = document.getElementById('ingresosConfirmedList');
+  confWrap.innerHTML = confirmed.length ? confirmed.slice().reverse().map(l=>`
+    <div class="list-item ${l.diferencia===0?'diff-ok':'diff-bad'}">
+      <div class="li-left">
+        <div class="sku">${escapeHtml(l.sku)} · Lote ${escapeHtml(l.lote)}</div>
+        <div class="desc">${escapeHtml(l.desc)}</div>
+        <div class="meta">${escapeHtml(l.maquina)} · ${escapeHtml(l.fecha)}</div>
+        <span class="diff-badge ${l.diferencia===0?'ok':'bad'}">${l.diferencia===0?'Coincide':(l.diferencia>0?'+':'')+l.diferencia+' und'}</span>
+      </div>
+      <div class="li-right">${l.cantidadContada}<span class="u">reg. ${l.cantidad}</span></div>
+    </div>`).join('') : `<div class="empty-state"><p>Aún no confirmas ningún ingreso.</p></div>`;
+}
+
+function exportIngresosReport(){
+  const confirmed = Object.values(state.ingresos);
+  if(!confirmed.length){ showToast('No hay ingresos confirmados para exportar'); return; }
+  const rows = confirmed.map(l=>({
+    SKU: l.sku, Producto: l.desc, Lote: l.lote, Maquina: l.maquina, Fecha: l.fecha,
+    CantidadProduccion: l.cantidad, CantidadContada: l.cantidadContada, Diferencia: l.diferencia,
+    Estado: l.diferencia===0 ? 'OK' : (l.diferencia>0 ? 'SOBRANTE' : 'FALTANTE'),
+    ConfirmadoPor: l.confirmadoPor, Hora: l.ts
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ingresos');
+  const fname = `ingreso_produccion_${dateStamp()}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  showToast('Reporte exportado: ' + fname);
+}
+
+/* ============================================================
+   LAYOUT DE ALMACÉN (prototipo)
+=============================================================*/
+function renderLayout(){
+  const classified = state.products.filter(p => p.abc && p.categoria && p.pallets !== null && p.pallets > 0);
+  const pending = state.products.filter(p => !(p.abc && p.categoria && p.pallets !== null && p.pallets > 0));
+
+  const totalPallets = classified.reduce((s,p)=> s + (p.pallets||0), 0);
+  const totalArea = classified.reduce((s,p)=> s + (p.area||0), 0);
+  document.getElementById('layoutTotalPallets').textContent = totalPallets;
+  document.getElementById('layoutTotalArea').textContent = totalArea.toFixed(1);
+  document.getElementById('layoutPending').textContent = pending.length;
+
+  const zonesWrap = document.getElementById('layoutZones');
+  if(!classified.length){
+    zonesWrap.innerHTML = `<div class="empty-state"><div class="em-icon">▦</div><p>Sube un Excel con las columnas Clasificación ABC, Categoría de Caja y Pallets Necesarios para ver el mapa.</p></div>`;
+    document.getElementById('pendingClassifyList').innerHTML = '';
+    return;
+  }
+
+  const zoneLabels = {A:'Zona A · Alta rotación (más cerca de la puerta)', B:'Zona B · Rotación media', C:'Zona C · Baja rotación (más al fondo)'};
+  let html = '';
+  ['A','B','C'].forEach(zone=>{
+    const items = classified.filter(p=>p.abc===zone).sort((a,b)=> (b.pallets||0)-(a.pallets||0));
+    if(!items.length) return;
+    const zonePallets = items.reduce((s,p)=>s+(p.pallets||0),0);
+    html += `
+      <div class="zone-section">
+        <div class="zone-header">
+          <div class="zone-badge zone-${zone}">${zone}</div>
+          <div>
+            <h4>${zoneLabels[zone]}</h4>
+            <div class="zh-sub">${items.length} productos · ${zonePallets} pallets</div>
+          </div>
+        </div>
+        <div class="pallet-grid">
+          ${items.map(p=>`
+            <div class="pallet-block zone-${zone}">
+              <div class="pb-sku">${escapeHtml(p.sku)}</div>
+              <div class="pb-desc">${escapeHtml(p.desc)}</div>
+              <span class="pb-pallets">${p.pallets} pal.</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  });
+  zonesWrap.innerHTML = html;
+
+  const pendWrap = document.getElementById('pendingClassifyList');
+  pendWrap.innerHTML = pending.length ? pending.map(p=>`
+    <div class="list-item">
+      <div class="li-left">
+        <div class="sku">${escapeHtml(p.sku)}</div>
+        <div class="desc">${escapeHtml(p.desc)}</div>
+      </div>
+      <div class="li-right" style="color:var(--steel); font-size:11px;">Stock<br>${p.stock}</div>
+    </div>`).join('') : `<div class="empty-state"><p>Todos los productos están clasificados.</p></div>`;
+}
+
+function togglePendingList(){
+  const el = document.getElementById('pendingClassifyList');
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function prefillGithubConfig(){
+  const cfg = getGithubConfig();
+  if(cfg){
+    document.getElementById('ghOwner').value = cfg.owner || '';
+    document.getElementById('ghRepo').value = cfg.repo || '';
+    document.getElementById('ghToken').value = cfg.token || '';
+  }
+}
+
+/* ---------------- Publicación automática a GitHub ---------------- */
+const GH_CONFIG_KEY = 'bartori_github_config_v1';
+
+function saveGithubConfig(){
+  const owner = document.getElementById('ghOwner').value.trim();
+  const repo = document.getElementById('ghRepo').value.trim();
+  const token = document.getElementById('ghToken').value.trim();
+  if(!owner || !repo || !token){ showToast('Completa los 3 campos'); return; }
+  localStorage.setItem(GH_CONFIG_KEY, JSON.stringify({owner, repo, token}));
+  showToast('✓ Configuración guardada en este celular');
+  goTo('menu');
+}
+
+function getGithubConfig(){
+  try{
+    const raw = localStorage.getItem(GH_CONFIG_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+async function exportStockSnapshot(){
+  if(!state.products.length){ showToast('Primero carga tu base de productos'); return; }
+  const payload = {
+    updatedAt: new Date().toLocaleString('es-PE'),
+    products: state.products.map(p => ({
+      sku: p.sku, desc: p.desc, ubicacion: p.ubicacion, zona: p.zona, stock: p.stock, abc: p.abc || ''
+    }))
+  };
+  const jsonStr = JSON.stringify(payload, null, 2);
+  const cfg = getGithubConfig();
+
+  if(!cfg){
+    downloadStockJson(jsonStr);
+    showToast('stock.json descargado — o configura la publicación automática en el menú');
+    return;
+  }
+
+  showToast('Publicando en GitHub...');
+  try{
+    await publishToGithub(cfg, jsonStr);
+    showToast('✓ Stock actualizado — Producción/Ventas ya lo pueden ver');
+  }catch(e){
+    console.error(e);
+    showToast('⚠ No se pudo publicar automáticamente. Descargando archivo para subirlo a mano.');
+    downloadStockJson(jsonStr);
+  }
+}
+
+function downloadStockJson(jsonStr){
+  const blob = new Blob([jsonStr], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'stock.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function publishToGithub(cfg, jsonStr){
+  const apiUrl = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/stock.json`;
+  const headers = {
+    'Authorization': `Bearer ${cfg.token}`,
+    'Accept': 'application/vnd.github+json'
+  };
+
+  // 1) Check if the file already exists, to get its SHA (required to update)
+  let sha = null;
+  const getRes = await fetch(apiUrl, { headers });
+  if(getRes.status === 200){
+    const getData = await getRes.json();
+    sha = getData.sha;
+  } else if(getRes.status !== 404){
+    throw new Error('No se pudo verificar el archivo (status ' + getRes.status + ')');
+  }
+
+  // 2) Create or update the file
+  const body = {
+    message: 'Actualizar stock.json — ' + new Date().toLocaleString('es-PE'),
+    content: b64EncodeUnicode(jsonStr),
+    ...(sha ? {sha} : {})
+  };
+  const putRes = await fetch(apiUrl, {
+    method: 'PUT', headers: {...headers, 'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if(!putRes.ok){
+    const errBody = await putRes.json().catch(()=>({}));
+    throw new Error('GitHub API error: ' + putRes.status + ' ' + (errBody.message||''));
+  }
+}
+
+function b64EncodeUnicode(str){
+  return btoa(unescape(encodeURIComponent(str)));
 }
 
 /* ============================================================
