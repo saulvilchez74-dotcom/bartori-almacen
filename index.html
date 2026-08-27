@@ -754,8 +754,8 @@ try{
 const FieldValue = () => firebase.firestore.FieldValue;
 
 /* ---------------- Google Sheets (Excel en vivo) ---------------- */
-const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyvlV39r1IdOaongCSbbQygMk1ixBNpPhLUWGaZbqqeON_iW56oVZJStD0fHZWNXcWKvA/exec';
-const PEDIDOS_URL = 'https://script.google.com/macros/s/AKfycbxlOsTVaJOaGbENrAiMhJLn1XLhu9bJ-lC5M5qleptYQ5ecW-M0i2ej4ApG6v-NSttTPA/exec'; // solo para marcar pedidos completados (POST)
+const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxlOsTVaJOaGbENrAiMhJLn1XLhu9bJ-lC5M5qleptYQ5ecW-M0i2ej4ApG6v-NSttTPA/exec';
+const PEDIDOS_URL = 'https://script.google.com/macros/s/AKfycbx3GrtYHGDr3LMvBRkF0N53Cs_24cDcVlHKUQBGf-HxoDDhN6lVOsITCmbKqVsNIERUeQ/exec'; // solo para marcar pedidos completados (POST)
 const PEDIDOS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRwTjPOztonDuNGwzC1gLpavEHUucodGBVUK7MVaI3WZl2v1CX0OG0SK3KkfiyZecfr96EMo8aUM4ik/pub?gid=634573738&single=true&output=csv'; // para leer los pedidos (GET)
 
 function postToSheet(payload){
